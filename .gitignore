@@ -1,0 +1,11 @@
+# Netbeans
+/nbproject/
+
+# redbean php directory
+/sys/ext/redbean
+
+# config (except example files)
+/app/conf/base.php
+
+# to do file
+TODO.txt
