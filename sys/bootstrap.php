@@ -36,15 +36,27 @@
 class FCF_Bootstrap
 {
 	public static function run(){
+		// what is the location of the front controller
+		$scriptLocation = $_SERVER['SCRIPT_FILENAME'];
+		// where is our front controller's directory
+		$scriptDir = substr($scriptLocation, 0, strrpos($scriptLocation, '/'));
+		// define root directory
+		define("FCF_ROOT", $scriptDir);
+		// define the path to the application
+		define("FCF_APP", FCF_ROOT . "/app");
+		// if we do not have to run a command or a transaction:
 		if(!(isset($_POST["tr"]) || isset($_GET["tr"]) || isset($_POST["comm"]) || isset($_GET["comm"]))){
 			self::initPage();
 		}else{
+			// setup redbean, initialize directories, etc.
 			self::initFCF();
 			if(isset($_POST["tr"]) || isset($_GET["tr"])){
+				// execute a transaction
 				$tr = new FCF_Transaction(isset($_POST["tr"]) ? $_POST : $_GET);
 				exit($tr->exec());
 			}
 			else{
+				// execute a command
 				$commName = isset($_POST["comm"]) ? $_POST["comm"] : $_GET["comm"];
 				$commParams = isset($_POST['params']) ? $_POST['params'] : isset($_GET['params']) ? $_GET['params'] : array();
 				$comm = new FCF_SysCommand($commName, $commParams);
@@ -53,12 +65,6 @@ class FCF_Bootstrap
 		}
 	}
 	public static function initFCF(){
-		// define the root directory
-		define("FCF_ROOT", substr($_SERVER['SCRIPT_FILENAME'], 0, strrpos($_SERVER['SCRIPT_FILENAME'], '/')));
-
-		// define the path to the php application (this should contain the configuration file)
-		define("FCF_APP", FCF_ROOT . "/app");
-		
 		// define the path to the framework main directory
 		define("FCF_SYS", FCF_ROOT . "/sys");
 		
@@ -73,7 +79,9 @@ class FCF_Bootstrap
 		FatClientFramework::init();
 	}
 	public static function initPage(){
-		echo "page";
+		if(!(file_exists(FCF_APP . "/pages/index.php"))){
+			die("no app/pages/index.php file");
+		}
 	}
 }
 ob_start();
