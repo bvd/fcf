@@ -79,9 +79,11 @@ class FCF_Bootstrap
 		FatClientFramework::init();
 	}
 	public static function initPage(){
-		if(!(file_exists(FCF_APP . "/pages/index.php"))){
-			die("no app/pages/index.php file");
+		$indexPage = FCF_APP . "/pages/index.php";
+                if(!(file_exists($indexPage))){
+			die("error: " . $indexPage . " does not exist");
 		}
+                require_once $indexPage;
 	}
 }
 ob_start();
