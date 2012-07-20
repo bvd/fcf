@@ -4,8 +4,14 @@
 # redbean php directory
 /sys/ext/redbean
 
-# config (except example files)
-/app/conf/base.php
+# application (created by install command)
+/app/
+
+# web data (created by install command. css, js etc go here)
+/webdata/
+
+# user data (created by install command. user owned files go here)
+/userdata/
 
 # to do file
 TODO.txt
