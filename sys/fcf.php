@@ -34,7 +34,10 @@
  */
 require_once(FCF_SYS . "/ext/redbean/rb.php");
 class FCF_RedBean_BeanCan extends RedBean_BeanCan{
-	protected function encodeResponse($response){
+    public function __construct() {
+        parent::__construct();
+    }	
+    protected function encodeResponse($response){
 		return $response;
 	}
 	private function loadRelatedBeans($data){
@@ -129,6 +132,11 @@ class FatClientFramework
                 {
                     require_once $filename;
                 }
+                // load the framework command files
+                foreach (glob(FCF_SYS . "/commands/*.php") as $filename)
+                {
+                    require_once $filename;
+                }
                 // load the application model files
                 foreach (glob(FCF_APP . "/models/*.php") as $filename)
                 {
@@ -181,14 +189,12 @@ class FCF_SysCommand {
         $this->params = $commandParams;
     }
     function run(){
-        $rsp = new stdClass();
-        $rsp->id = $_POST["sys"];
-        if($this->comm == self::$SYSCOMM_NUKE){
-            R::nuke();  
-        }elseif($this->comm == self::$SYSCOMM_INSTALL){
-            // this is automated by setting red bean
+        $commandName = "FCF_Command_" . ucfirst($this->comm);
+        if(!(class_exists($commandName))){
+            die("could not find command " . $commandName);
         }
-        return json_encode($rsp);
+        $command = new $commandName();
+        return $command->run();
     }
 }
 class FCF_Exception extends Exception

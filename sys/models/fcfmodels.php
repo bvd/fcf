@@ -509,4 +509,35 @@ class Model_Role extends FCF_RedBean_SimpleModel {
         return $ret;
     }
 }
+class Model_Location extends FCF_RedBean_SimpleModel {
+    public function update() {
+        
+    }
+	public function after_update() {
+        
+    }
+	public function open() {
+        //throw new spdException('not implemented');
+    }
+	public function delete() {
+        throw new spdException('not implemented');
+    }
+	public function after_delete() {
+        throw new spdException('not implemented');
+    }
+	public function dispense() {
+        $this->bean->pending = true;
+        $this->time = time();
+    }
+}
+class spdTools {
+    public static function randStr($length){
+        $ret = "";
+        $randpick = "1234567890qwertyuiopasdfghjklzxcvbnm";
+    	while (strlen($ret) < $length){
+    		$ret .= $randpick[rand(0, strlen($randpick)-1)];
+        }
+        return $ret;
+    }
+}
 ?>
