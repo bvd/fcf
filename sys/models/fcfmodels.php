@@ -143,6 +143,7 @@ class Model_Session extends FCF_RedBean_SimpleModel {
         }
         $ret = new stdClass();
         $ret->id = $user->id;
+        $ret->screenName = $user->screenName;
         return $ret;
     }
     public function update(){
