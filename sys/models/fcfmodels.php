@@ -216,10 +216,12 @@ class Model_Userinvite extends FCF_RedBean_SimpleModel{
         $this->bean->mailToken = FCF_Tools::randStr(32);
         $to      = $this->bean->mail;
         $subject = 'invitation to urbantranslations.net';
-        $message = 'Please click this link to activate your subscription: <a href="' . $config->base_url . 'index.php?userInvite=' . $this->bean->mailToken . '">go here</a>';
-        $headers = 'From: ' . $config->sysmailfrom . "\r\n" .
-            'Reply-To: ' . $config->sysmailreply . "\r\n" .
-            'X-Mailer: PHP/' . phpversion();
+        $message = 'Welcome to the urban translations website. Please complete your subscription under the following link. After you complete your subscription, if you forget your password, you may use this e-mail address to reset your password. Now, <a href="' . $config->base_url . 'index.php?userInvite=' . $this->bean->mailToken . '">go here</a>';
+        $headers = 'From: ' . $config->sysmailfrom . PHP_EOL;
+        $headers .= 'Reply-To: ' . $config->sysmailreply . PHP_EOL;
+        $headers .= 'X-Mailer: PHP/' . phpversion() . PHP_EOL;
+        $headers .= 'MIME-Version: 1.0' . PHP_EOL;
+        $headers .= 'Content-Type: text/html; charset=ISO-8859-1' . PHP_EOL;
         mail($to, $subject, $message, $headers);
 	return true;
         
