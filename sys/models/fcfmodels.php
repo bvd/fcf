@@ -141,9 +141,19 @@ class Model_Session extends FCF_RedBean_SimpleModel {
             $ret->id = -1;
             return $ret;
         }
+        
         $ret = new stdClass();
+        
         $ret->id = $user->id;
         $ret->screenName = $user->screenName;
+        
+        $ret->userRoles = array();
+        $rolesArr = $user->sharedRole;
+        foreach($rolesArr as $id => $roleBean){
+            $ret->userRoles[$id] = $roleBean->name;
+        }
+        
+        
         return $ret;
     }
     public function update(){
