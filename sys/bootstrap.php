@@ -86,13 +86,13 @@ class FCF_Bootstrap
                 require_once $indexPage;
 	}
 }
-ob_start();
+//ob_start();
 try{
 	FCF_Bootstrap::run();
 } 
 catch (Exception $e) {
-	ob_end_clean();
+	//ob_end_clean();
 	echo "ERROR: " . $e->getMessage();
 }
-ob_end_flush();
+//ob_end_flush();
 ?>

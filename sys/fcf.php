@@ -293,7 +293,13 @@ class FCF_RedBean_SimpleModel extends RedBean_SimpleModel {
     public static function addPermission($permission) {
         self::$permissions[] = $permission;
     }
-
+    // TODO permission should have optionally a filter for fields
+    // for example you want to have a standard filter for users
+    // that can be altered in case of a log in to get the password
+    
+    // the same type of filter could also be applied as an "always allow read"
+    // for example in the user export function for non sensitive data
+    // like an enumeration as an exception to a restrictive policy
     protected static function permit($permissionType, $beanInstance) {
         // we can check each permission that the class has collected
         // where a permission for this instance and type (r,w,d)
@@ -323,6 +329,13 @@ class FCF_RedBean_SimpleModel extends RedBean_SimpleModel {
                 $val = $permission->allowForKeyVal[$key];
                 if (array_key_exists($key, $instProps)) {
                     if ($instProps[$key] == $val) {
+                        array_splice(self::$permissions, $thisIndex, 1);
+                        return true;
+                    }
+                }
+                if($key == "type" || $key == "id"){
+                    $instanceVal = $beanInstance->getMeta($key);
+                    if($instanceVal == $val){
                         array_splice(self::$permissions, $thisIndex, 1);
                         return true;
                     }

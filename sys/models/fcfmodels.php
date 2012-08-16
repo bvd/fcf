@@ -43,13 +43,17 @@ class Model_Session extends FCF_RedBean_SimpleModel {
             if(!(array_key_exists($roleId, $userRoles))) return false;
         }return true;
     }
+    // to do deprecate
     public static function getLoggedInUser(){
         $thisSS = MM::allowOne(R::find('session',' ssid = ?',array(session_id())),null);
         $user;
+        // to open the user we need a permission because opening users is generally not allowed
+        
         if($thisSS) $user = R::relatedOne($thisSS, 'user'); else return false;
         if(!$user) return false;
         return $user;
     }
+    // to do deprecate
     public static function findRolesForLoggedInUser(){
         // get this sessions user
         $thisSS = MM::allowOne(R::find('session',' ssid = ?',array(session_id())),null);
@@ -61,6 +65,8 @@ class Model_Session extends FCF_RedBean_SimpleModel {
         else $roles = R::related($user->bean,'role');
         return $roles;
     }
+    // TODO this should be part of the user model.
+    // it should be enough to just retrieve the session user from the session model
     public static function hasLoggedInUserForOneOfRoles($roleIds){
         $userRoles = self::findRolesForLoggedInUser();
         if(!$userRoles) return false;
@@ -217,10 +223,20 @@ class Model_Userinvite extends FCF_RedBean_SimpleModel{
             mail($to, $subject, $message, $headers);
             return true;
 	}
-        
-        
+        if($this->bean->resetEmail == 1){
+            $config = SimpleConfig::GetInstance();
+            $this->bean->mailToken = FCF_Tools::randStr(32);
+            $to      = $this->bean->mail;
+            $subject = 'email reset for urbantranslations.net';
+            $message = 'Please click this link to complete your email reset: <a href="' . $config->base_url . 'index.php?userInviteResetEmail=' . $this->bean->mailToken . '">go here</a>';
+            $headers =      'From: ' . $config->sysmailfrom . "\r\n" .
+                            'Reply-To: ' . $config->sysmailreply . "\r\n" .
+                            'X-Mailer: PHP/' . phpversion();
+            mail($to, $subject, $message, $headers);
+            return true;
+	}
         //
-        // IN CASE OF ACCOUNT CREATION
+        // IN CASE OF THE DEFAULT IE ACCOUNT CREATION
         //
         $config = SimpleConfig::GetInstance();
         $this->bean->mailToken = FCF_Tools::randStr(32);
@@ -246,13 +262,16 @@ class Model_Userinvite extends FCF_RedBean_SimpleModel{
         $this->bean->pending = true;
         $this->bean->time = time();
     }
-    private function userForToken($token){
-        $userinvite = MM::allowOne(R::find('userinvite',' mailToken = ?',array($token)),'could not find userinvite for token');
-        $user = MM::allowOne(R::find('user',' mail = ?',array($userinvite->mail)), 'could not find user for ' . $userinvite->mail);
-        return $user;
-    }
     public function userNameForToken($token){
-        return $this->userForToken($token)->loginName;
+        $userinvite = MM::allowOne(R::find('userinvite',' mailToken = ?',array($token)),'could not find userinvite for token');
+        if($userinvite->resetEmail){
+            $user = Model_Session::getLoggedInUser();
+            $user->mail = $userinvite->mail;
+            R::store($user);
+        }else{
+            $user = MM::allowOne(R::find('user',' mail = ?',array($userinvite->mail)), 'could not find user for ' . $userinvite->mail); 
+        }
+        return $user->loginName;
     }
     public function resetPassword($token,$passwdhash){
         $user = $this->userForToken($token);
@@ -284,6 +303,11 @@ class Model_User extends FCF_RedBean_SimpleModel {
             Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_MODERATOR),
             Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_SYSADMIN),
         ))){
+            return true;
+        }
+        // if the logged in user is the stored user, OK
+        $loggedInUser = Model_Session::getLoggedInUser();
+        if($loggedInUser->id == $this->bean->id){
             return true;
         }
         // if you were invited, OK
@@ -318,9 +342,52 @@ class Model_User extends FCF_RedBean_SimpleModel {
         
     }
     public function open() {
-        // not-pending (existing) users need special permissions
         if(!$this->bean->pending){
-            return parent::permit(FCF_Permission::$QUERY_TYPE_READ,$this->bean);
+            // TODO it is generally allowed to open a user but it will be stripped according to role
+            // TODO TO DEPR it is generally forbidden to open a user 
+            // except if the program added a permission during this script execution
+            $permitted = parent::permit(FCF_Permission::$QUERY_TYPE_READ,$this->bean);
+            if(!($permitted)){
+                // if it is not permitted we can make exceptions
+                $sessionUserIsAdminOrModerator;
+                $sessionUserIsOpenedUser;
+                // To find out who is the session user
+                // the session has a method that returns this user.
+                // Beware that, in order to do so, it thus opens a user.
+                // This will bring about this function again (Model_User->open).
+                // To prevent a never ending loop from occuring we need a permission for a user type bean.
+                $permission = new FCF_Permission(FCF_Permission::$QUERY_TYPE_READ, 1345046702, null, array("type" => "user"));
+                // we could add it to the parent (if it were another bean type) but we might as well use this class.
+                self::addPermission($permission);
+                $sessionUser = Model_Session::getLoggedInUser();
+                $sessionUserIsOpenedUser = $sessionUser->id == $this->id;
+                if($sessionUserIsOpenedUser) return;
+                // the same story as above about the nested loop problem
+                $permission = new FCF_Permission(FCF_Permission::$QUERY_TYPE_READ, 1345107157, null, array("type" => "user"));
+                self::addPermission($permission);
+                // roles to permit reading a user:
+                $allowedRoleIds = array();
+                $allowedRoleIds[] = Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_SYSADMIN);
+                $allowedRoleIds[] = Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_MODERATOR);
+                $sessionUserHasOneOfAllowedRoles = Model_Session::hasLoggedInUserForOneOfRoles($allowedRoleIds);
+                if($sessionUserHasOneOfAllowedRoles) return;
+                // now we are going to use an always readable policy
+                // with a restrictive per field permission
+                // where exceptions are made on following fields
+                $fieldExceptions = array("id","screenName");
+                $fieldsToRemove = array();
+                $props = $this->bean->getProperties();
+                foreach ($props as $k => $v) {
+                    if(!(in_array($k,$fieldExceptions))){
+                        $fieldsToRemove[] = $k;
+                    }
+                }
+                $noClue = "almost";
+                foreach($fieldsToRemove as $fieldToRemove){
+                    $this->bean->removeProperty($fieldToRemove);
+                }
+                $noClue = "true";
+            }
         }
     }
 	public function delete() {
@@ -346,13 +413,22 @@ class Model_User extends FCF_RedBean_SimpleModel {
 	 */
     public function resetPassword($mail){
         $user = MM::allowOne(R::find('user',' mail = ?',array($mail)),'could not find mail address');
-
         $userinvite = R::dispense('userinvite');
-
-
         $userinvite->mail = $user->mail;
-        $userinvite->resetPassword = 1;
-		
+        $userinvite->resetPassword = 1;	
+        parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1337639411, $userinvite));
+        R::store($userinvite);
+        $ret = new stdClass();
+        $ret->success = 1;
+        return $ret;
+    }
+    public function resetEmail($mail){
+        $user = Model_Session::getLoggedInUser();
+        if(!$user) throw new FCF_Exception("no user was returned from session");
+        if($user->id < 0) throw new FCF_Exception("no user was logged in to session");
+        $userinvite = R::dispense('userinvite');
+        $userinvite->mail = $mail;
+        $userinvite->resetEmail = 1;	
         parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1337639411, $userinvite));
         R::store($userinvite);
         $ret = new stdClass();
