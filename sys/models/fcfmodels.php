@@ -360,7 +360,7 @@ class Model_User extends FCF_RedBean_SimpleModel {
                 // we could add it to the parent (if it were another bean type) but we might as well use this class.
                 self::addPermission($permission);
                 $sessionUser = Model_Session::getLoggedInUser();
-                $sessionUserIsOpenedUser = $sessionUser->id == $this->id;
+                $sessionUserIsOpenedUser = ($sessionUser == null) ? false : $sessionUser->id == $this->id;
                 if($sessionUserIsOpenedUser) return;
                 // the same story as above about the nested loop problem
                 $permission = new FCF_Permission(FCF_Permission::$QUERY_TYPE_READ, 1345107157, null, array("type" => "user"));
