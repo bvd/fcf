@@ -299,19 +299,7 @@ class Model_User extends FCF_RedBean_SimpleModel {
         $this->bean->pending = 0;
         if(parent::permit(FCF_Permission::$QUERY_TYPE_WRITE, $this->bean)) return true;
         // if you are logged in as an admin, OK
-        if(Model_Session::hasLoggedInUserForOneOfRoles(array(
-            Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_MODERATOR),
-            Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_SYSADMIN),
-        ))){
-            return true;
-        }
-        // if the logged in user is the stored user, OK
-        $loggedInUser = Model_Session::getLoggedInUser();
-        if($loggedInUser){
-            if($loggedInUser->id == $this->bean->id){
-                return true;
-            }
-        }
+        
         // if you were invited, OK
         if($this->bean->invite){
             
@@ -320,9 +308,11 @@ class Model_User extends FCF_RedBean_SimpleModel {
             // if this passed, we retrieve the book to user relation
             $answer = R::relatedOne($invite, 'answer');
             $role = R::relatedOne($invite, 'role');
-            $book = R::relatedOne($answer, 'book');
-            parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440252, $this->bean));
-            R::associate($book,$this->bean);
+            if($answer){
+                $book = R::relatedOne($answer, 'book');
+                parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440252, $this->bean));
+                R::associate($book,$this->bean);
+            }
             parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440254, $this->bean));
             parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440256, $role->bean));
             R::associate($role,$this->bean);
@@ -338,6 +328,19 @@ class Model_User extends FCF_RedBean_SimpleModel {
             parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440260, $this->bean));
             R::associate($sess, $this->bean);
             return true;
+        }
+        if(Model_Session::hasLoggedInUserForOneOfRoles(array(
+            Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_MODERATOR),
+            Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_SYSADMIN),
+        ))){
+            return true;
+        }
+        // if the logged in user is the stored user, OK
+        $loggedInUser = Model_Session::getLoggedInUser();
+        if($loggedInUser){
+            if($loggedInUser->id == $this->bean->id){
+                return true;
+            }
         }
     }
 	public function after_update() {
