@@ -307,8 +307,10 @@ class Model_User extends FCF_RedBean_SimpleModel {
         }
         // if the logged in user is the stored user, OK
         $loggedInUser = Model_Session::getLoggedInUser();
-        if($loggedInUser->id == $this->bean->id){
-            return true;
+        if($loggedInUser){
+            if($loggedInUser->id == $this->bean->id){
+                return true;
+            }
         }
         // if you were invited, OK
         if($this->bean->invite){
