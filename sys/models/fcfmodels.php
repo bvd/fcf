@@ -291,8 +291,12 @@ class Model_User extends FCF_RedBean_SimpleModel {
 	 * You can only store a user if it has the ownLocation property pointing to an existing location.
 	 */
     public function update() {
-    	if(!$this->bean->ownLocation) throw new FCF_Exception('cannot update user without ownLocation property');
-        if(!strlen($this->bean->loginName) >= 8) throw new FCF_Exception('loginName must have 8 or more characters');
+    	if(!$this->bean->ownLocation) {
+            throw new FCF_Exception('cannot update user without ownLocation property');
+        }
+        if(strlen($this->bean->loginName) < 8) {
+            throw new FCF_Exception('loginName must have 8 or more characters');
+        }
         foreach($this->bean->ownLocation as $arrId => $loc){
             $loc->pending = 0;
         }
