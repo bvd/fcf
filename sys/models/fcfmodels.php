@@ -391,6 +391,7 @@ class Model_User extends FCF_RedBean_SimpleModel {
             // TODO TO DEPR it is generally forbidden to open a user 
             // except if the program added a permission during this script execution
             $permitted = parent::permit(FCF_Permission::$QUERY_TYPE_READ,$this->bean);
+            if(!($permitted)) $permitted = parent::canRead();
             if(!($permitted)){
                 // if it is not permitted we can make exceptions
                 $sessionUserIsAdminOrModerator;
@@ -426,11 +427,9 @@ class Model_User extends FCF_RedBean_SimpleModel {
                         $fieldsToRemove[] = $k;
                     }
                 }
-                $noClue = "almost";
                 foreach($fieldsToRemove as $fieldToRemove){
                     $this->bean->removeProperty($fieldToRemove);
                 }
-                $noClue = "true";
             }
         }
     }
@@ -496,6 +495,7 @@ class Model_User extends FCF_RedBean_SimpleModel {
         // get other users related to this book
         // this user must be younger than all of these users
         $oneBook = $book[key($book)];
+        parent::setSecurityLevel(parent::SECURITY_LEVEL_ALLOW_READ);
         $usersForBook = R::Related($oneBook,'user');
         $ret = new stdClass();
         foreach($usersForBook as $id => $userBean){
