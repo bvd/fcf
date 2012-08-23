@@ -163,7 +163,8 @@ class Model_Session extends FCF_RedBean_SimpleModel {
         return $ret;
     }
     public function update(){
-    	if(!(parent::permit(FCF_Permission::$QUERY_TYPE_WRITE, $this->bean))) throw new FCF_Exception ("update not permitted");
+    	if(parent::canWrite()) return true;
+        if(!(parent::permit(FCF_Permission::$QUERY_TYPE_WRITE, $this->bean))) throw new FCF_Exception ("update not permitted");
     }
     public function after_update(){}
     public function open(){}
@@ -291,63 +292,97 @@ class Model_User extends FCF_RedBean_SimpleModel {
 	 * You can only store a user if it has the ownLocation property pointing to an existing location.
 	 */
     public function update() {
-    	if(!$this->bean->ownLocation) {
+    	//
+        //
+        // VALIDATORS
+        //
+        //
+        
+        $bean = $this->bean;
+        //
+        // a user must always have a location
+        //
+        $ownLocation = $bean->ownLocation;
+        if(!$ownLocation) {
             throw new FCF_Exception('cannot update user without ownLocation property');
         }
-        if(strlen($this->bean->loginName) < 8) {
-            throw new FCF_Exception('loginName must have 8 or more characters');
+        //
+        // the login name may not have less than 8 characters
+        //
+        parent::minLengthOfField($bean,"loginName",8);
+        
+        //
+        // the login name must be unique
+        //
+        parent::uniqueBeanForField($bean, "loginName");
+        
+        //
+        // the email address must be unique
+        //
+        parent::uniqueBeanForField($bean, "mail");
+        
+        $allowed = false;
+        // either we have specific write permission
+        // or we have common write permission
+        // or we look for exceptional permissive situations
+        
+        $allowed = parent::permit(FCF_Permission::$QUERY_TYPE_WRITE, $this->bean);
+        if(!$allowed) $allowed = parent::canWrite();
+        if($allowed){
+            return true;
+        }else{
+            $allowed = Model_Session::hasLoggedInUserForOneOfRoles(array(
+                Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_MODERATOR),
+                Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_SYSADMIN),
+            ));
         }
+        if(!$allowed){
+            $loggedInUser = Model_Session::getLoggedInUser();
+            if($loggedInUser){
+                if($loggedInUser->id == $this->bean->id){
+                    $allowed = true;
+                }
+            }
+        }
+        if(!($allowed)){
+            // if not allowed at this point, the user must be invited
+            if($this->bean->invite){
+                parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_READ, 1329439469, 'userinvite'));
+                $invite = MM::allowOne(R::find('userinvite', ' mailToken = ?',array($this->bean->invite)),"invitation was not found");
+                $allowed = true;
+            }
+        }
+        if(!$allowed) throw new FCF_Exception("not allowed: Model_User->update");
+        //
+        //
+        // END OF VALIDATOR SECTION,
+        // START OF FILTER SECTION
+        //
+        //
         foreach($this->bean->ownLocation as $arrId => $loc){
             $loc->pending = 0;
         }
         $this->bean->pending = 0;
-        if(parent::permit(FCF_Permission::$QUERY_TYPE_WRITE, $this->bean)) return true;
-        // if you are logged in as an admin, OK
-        
-        // if you were invited, OK
-        if($this->bean->invite){
-            
-            parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_READ, 1329439469, 'userinvite'));
-            $invite = MM::allowOne(R::find('userinvite', ' mailToken = ?',array($this->bean->invite)),"invitation was not found");
-            // if this passed, we retrieve the book to user relation
+        if(isset($invite)){
+            parent::setSecurityLevel(parent::SECURITY_LEVEL_ALLOW_WRITE);
+            // retrieve the book-to-user relation
             $answer = R::relatedOne($invite, 'answer');
             $role = R::relatedOne($invite, 'role');
             if($answer){
                 $book = R::relatedOne($answer, 'book');
-                parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440252, $this->bean));
                 R::associate($book,$this->bean);
             }
-            parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440254, $this->bean));
-            parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440256, $role->bean));
             R::associate($role,$this->bean);
-            parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440258, $this->bean));
             $this->bean->mail = $invite->mail;
             R::trash($invite);
             $sess = MM::allowOne(R::findOrDispense('session', ' ssid = ?',array(session_id())),null);
             $sess->ssid = session_id();
-            parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440268, $sess));
             R::store($sess);
             $_SESSION['authUser'] = "y";
-            parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440259, $sess->bean));
-            parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1329440260, $this->bean));
             R::associate($sess, $this->bean);
-            return true;
-        }
-        if(Model_Session::hasLoggedInUserForOneOfRoles(array(
-            Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_MODERATOR),
-            Model_Role::getRoleIdForName(Model_Role::$ROLE_NAME_SYSADMIN),
-        ))){
-            return true;
-        }
-        // if the logged in user is the stored user, OK
-        $loggedInUser = Model_Session::getLoggedInUser();
-        if($loggedInUser){
-            if($loggedInUser->id == $this->bean->id){
-                return true;
-            }
         }
     }
-	public function after_update() {
+    public function after_update() {
         
     }
     public function open() {
@@ -575,6 +610,7 @@ class Model_Role extends FCF_RedBean_SimpleModel {
         $adminRole = R::find('role', ' name = :rolename', array( ':rolename'=>'sysadmin' ));
         $adminRole = $adminRole[key($adminRole)];
         $adUser->sharedRole[] = $adminRole;
+        parent::addPermission(new FCF_Permission(FCF_Permission::$QUERY_TYPE_WRITE, 1345642595, $adUser));
         R::store($adUserLoc);
         R::store($adUser);
         	

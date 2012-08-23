@@ -289,6 +289,65 @@ class FCF_RedBean_SimpleModel extends RedBean_SimpleModel {
     }
 
     private static $permissions = array();
+    
+    const SECURITY_LEVEL_ALLOW_NONE = "none";
+    const SECURITY_LEVEL_ALLOW_READ = "read";
+    const SECURITY_LEVEL_ALLOW_WRITE = "write";
+    
+    private static $_security_level = self::SECURITY_LEVEL_ALLOW_NONE;
+    
+    protected static function setSecurityLevel($level){
+        if(!($level == self::SECURITY_LEVEL_ALLOW_NONE || $level == self::SECURITY_LEVEL_ALLOW_READ || $level == self::SECURITY_LEVEL_ALLOW_WRITE)){
+            throw new FCF_Exception("invalid security level: " . $level);
+        }else{
+            self::$_security_level = $level;
+        }
+    }
+    protected static function canRead(){
+        return self::$_security_level == self::SECURITY_LEVEL_ALLOW_READ || self::$_security_level == self::SECURITY_LEVEL_ALLOW_WRITE;
+    }
+    protected static function canWrite(){
+        return self::$_security_level == self::SECURITY_LEVEL_ALLOW_WRITE;
+    }
+    protected static function uniqueBeanForField($bean, $fieldName){
+        $type = $bean->getMeta("type");
+        $testVal = $bean->$fieldName;
+        $otherBeans = R::find($type, " " . $fieldName . " = ? ", array($testVal));
+        if(!$otherBeans){
+            return true;
+        }
+        if(!(is_array($otherBeans))){
+            throw new FCF_Exception("SELECT * FROM " . $type . " WHERE " . $fieldName . " = " . $testVal . " result is not an array - 1345714311");
+        }
+        $numResults = count($otherBeans);
+        if($numResults == 0){
+            return true;
+        }
+        if($numResults > 1){
+            throw new FCF_Exception("not unique: " . $fieldName);
+        }
+        if($numResults == 1){
+            $testBeanId = $bean->id;
+            $retrievedBeanId = $otherBeans[key($otherBeans)]->id;
+            if($testBeanId == $retrievedBeanId){
+                return true;
+            }else{
+                throw new FCF_Exception("not unique: " . $fieldName);
+            }
+        }
+        return false;
+    }
+    protected static function minLengthOfField($bean,$fieldName,$minLength){
+        $type = $bean->getMeta("type");
+        $testVal = $bean->$fieldName;
+        if(!(is_string($testVal))){
+            throw new FCF_Exception("not a string: " . $testVal);
+        }
+        if(strlen($testVal) < $minLength){
+            throw new FCF_Exception("too short: " . $testVal . ", " . $fieldName . " should be shorter than " . $minLength);
+        }
+        return true;
+    }
 
     public static function addPermission($permission) {
         self::$permissions[] = $permission;
